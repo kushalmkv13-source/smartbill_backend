@@ -3,24 +3,20 @@ from django.urls import path
 from .views import (
     RegisterView,
     LoginView,
+    LogoutView,
     ForgotPasswordView,
     VerifyOTPView,
     ResetPasswordView,
     AdminUsersView,
+    AuditLogListView,
 )
+
+
 urlpatterns = [
 
-    path(
-        "admin/users/",
-        AdminUsersView.as_view(),
-        name="admin-users"
-    ),
-
-    path(
-        "admin/users/<int:user_id>/",
-        AdminUsersView.as_view(),
-        name="admin-user-detail"
-    ),
+    # =================================================
+    # AUTHENTICATION
+    # =================================================
 
     path(
         "register/",
@@ -33,6 +29,17 @@ urlpatterns = [
         LoginView.as_view(),
         name="login"
     ),
+
+    path(
+        "logout/",
+        LogoutView.as_view(),
+        name="logout"
+    ),
+
+
+    # =================================================
+    # PASSWORD RESET
+    # =================================================
 
     path(
         "forgot-password/",
@@ -50,5 +57,33 @@ urlpatterns = [
         "reset-password/",
         ResetPasswordView.as_view(),
         name="reset-password"
+    ),
+
+
+    # =================================================
+    # ADMIN USER MANAGEMENT
+    # =================================================
+
+    path(
+        "admin/users/",
+        AdminUsersView.as_view(),
+        name="admin-users"
+    ),
+
+    path(
+        "admin/users/<int:user_id>/",
+        AdminUsersView.as_view(),
+        name="admin-user-detail"
+    ),
+
+
+    # =================================================
+    # ADMIN AUDIT LOGS
+    # =================================================
+
+    path(
+        "audit-logs/",
+        AuditLogListView.as_view(),
+        name="audit-logs"
     ),
 ]

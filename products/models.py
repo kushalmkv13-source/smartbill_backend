@@ -50,11 +50,10 @@ class Product(models.Model):
         null=True
     )
 
-    image = models.ImageField(
-        upload_to="products/",
-        blank=True,
-        null=True
-    )
+    img = models.TextField(
+    blank=True,
+    null=True
+)
 
     description = models.TextField(
         blank=True,

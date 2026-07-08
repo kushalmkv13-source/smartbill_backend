@@ -25,28 +25,39 @@ class DashboardView(APIView):
 
     def get(self, request):
 
+        user = request.user
+
+        # Only this user's invoices
+        user_invoices = Invoice.objects.filter(user=user)
+
         total_revenue = (
-            Invoice.objects.aggregate(
+            user_invoices.aggregate(
                 total=Sum("grand_total")
             )["total"] or 0
         )
 
-        total_invoices = Invoice.objects.count()
-        total_customers = Customer.objects.count()
-        total_products = Product.objects.count()
+        total_invoices = user_invoices.count()
 
-        paid = Invoice.objects.filter(
+        total_customers = Customer.objects.filter(
+            user=user
+        ).count()
+
+        total_products = Product.objects.filter(
+            user=user
+        ).count()
+
+        paid = user_invoices.filter(
             status="Paid"
         ).count()
 
-        pending = Invoice.objects.filter(
+        pending = user_invoices.filter(
             status="Pending"
         ).count()
 
         monthly = [0] * 12
 
         monthly_data = (
-            Invoice.objects
+            user_invoices
             .annotate(month=ExtractMonth("invoice_date"))
             .values("month")
             .annotate(total=Sum("grand_total"))
@@ -54,7 +65,8 @@ class DashboardView(APIView):
         )
 
         for item in monthly_data:
-            monthly[item["month"] - 1] = float(item["total"])
+            if item["month"]:
+                monthly[item["month"] - 1] = float(item["total"])
 
         return Response({
             "revenue": float(total_revenue),

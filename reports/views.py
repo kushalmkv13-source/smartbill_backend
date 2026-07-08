@@ -48,7 +48,6 @@ from invoices.models import Invoice
 
 from .models import GeneratedReport
 
-
 # =====================================================
 # USER DASHBOARD REPORT
 # =====================================================
@@ -59,26 +58,25 @@ def dashboard_report(request):
 
     user = request.user
 
-    # -----------------------------
-    # Month Filter
-    # -----------------------------
+    # =================================================
+    # MONTH FILTER
+    # =================================================
 
-    month = request.GET.get("month")
+    selected_month = request.GET.get("month")
 
     invoices = Invoice.objects.filter(
         user=user
     )
 
-    if month:
-
+    if selected_month:
         invoices = invoices.filter(
-            invoice_date__month=month
+            invoice_date__month=selected_month
         )
 
 
-    # -----------------------------
-    # Dashboard Cards
-    # -----------------------------
+    # =================================================
+    # DASHBOARD CARDS
+    # =================================================
 
     total_customers = Customer.objects.filter(
         user=user
@@ -93,19 +91,38 @@ def dashboard_report(request):
     total_invoices = invoices.count()
 
 
+    # =================================================
+    # INVOICE STATUS ANALYTICS
+    # =================================================
+
     paid_invoices = invoices.filter(
-        status="Paid"
+        status__iexact="Paid"
     ).count()
 
 
-    pending_invoices = invoices.filter(
-        status="Pending"
+    unpaid_invoices = invoices.filter(
+        status__iexact="Unpaid"
     ).count()
 
 
-    # -----------------------------
-    # Revenue
-    # -----------------------------
+    draft_invoices = invoices.filter(
+        status__iexact="Draft"
+    ).count()
+
+
+    # Debug output
+    print("====================================")
+    print("INVOICE STATUS ANALYTICS")
+    print("Total:", total_invoices)
+    print("Paid:", paid_invoices)
+    print("Unpaid:", unpaid_invoices)
+    print("Draft:", draft_invoices)
+    print("====================================")
+
+
+    # =================================================
+    # TOTAL REVENUE
+    # =================================================
 
     total_revenue = (
         invoices.aggregate(
@@ -114,6 +131,10 @@ def dashboard_report(request):
         or 0
     )
 
+
+    # =================================================
+    # TODAY REVENUE
+    # =================================================
 
     today = timezone.localdate()
 
@@ -129,6 +150,10 @@ def dashboard_report(request):
     )
 
 
+    # =================================================
+    # CURRENT MONTH REVENUE
+    # =================================================
+
     monthly_revenue = (
         invoices.filter(
             invoice_date__month=today.month,
@@ -141,20 +166,28 @@ def dashboard_report(request):
     )
 
 
-    # -----------------------------
-    # Monthly Revenue Data
-    # -----------------------------
+    # =================================================
+    # MONTHLY REVENUE QUERY
+    # =================================================
 
     chart_data = (
         invoices
         .annotate(
-            month=TruncMonth("invoice_date")
+            chart_month=TruncMonth(
+                "invoice_date"
+            )
         )
-        .values("month")
+        .values(
+            "chart_month"
+        )
         .annotate(
-            total=Sum("grand_total")
+            total=Sum(
+                "grand_total"
+            )
         )
-        .order_by("month")
+        .order_by(
+            "chart_month"
+        )
     )
 
 
@@ -163,10 +196,18 @@ def dashboard_report(request):
 
     for row in chart_data:
 
-        monthly_data[
-            row["month"].month
-        ] = float(row["total"])
+        if row["chart_month"]:
 
+            monthly_data[
+                row["chart_month"].month
+            ] = float(
+                row["total"] or 0
+            )
+
+
+    # =================================================
+    # CHART ARRAYS
+    # =================================================
 
     revenue_chart = []
 
@@ -177,20 +218,33 @@ def dashboard_report(request):
     previous_revenue = None
 
 
-    for i in range(1, 13):
+    # =================================================
+    # CREATE 12 MONTH DATA
+    # =================================================
+
+    for month_number in range(1, 13):
 
         revenue = monthly_data.get(
-            i,
+            month_number,
             0
         )
 
 
         expenses = revenue * 0.30
 
-        profit = revenue - expenses
+
+        profit = (
+            revenue -
+            expenses
+        )
+
 
         gst = revenue * 0.18
 
+
+        # ---------------------------------------------
+        # Growth Calculation
+        # ---------------------------------------------
 
         if previous_revenue is None:
 
@@ -212,68 +266,98 @@ def dashboard_report(request):
             ) * 100
 
 
+        # ---------------------------------------------
+        # Revenue Chart
+        # ---------------------------------------------
+
         revenue_chart.append(
             {
-                "month": month_abbr[i],
+                "month":
+                    month_abbr[
+                        month_number
+                    ],
 
-                "amount": round(
-                    revenue,
-                    2
-                )
+                "amount":
+                    round(
+                        revenue,
+                        2
+                    )
             }
         )
 
+
+        # ---------------------------------------------
+        # Analytics Chart
+        # ---------------------------------------------
 
         analytics_chart.append(
             {
-                "month": month_abbr[i],
+                "month":
+                    month_abbr[
+                        month_number
+                    ],
 
-                "revenue": round(
-                    revenue,
-                    2
-                ),
+                "revenue":
+                    round(
+                        revenue,
+                        2
+                    ),
 
-                "expenses": round(
-                    expenses,
-                    2
-                ),
+                "expenses":
+                    round(
+                        expenses,
+                        2
+                    ),
 
-                "profit": round(
-                    profit,
-                    2
-                )
+                "profit":
+                    round(
+                        profit,
+                        2
+                    )
             }
         )
 
 
+        # ---------------------------------------------
+        # Monthly Table
+        # ---------------------------------------------
+
         monthly_table.append(
             {
-                "month": month_abbr[i],
+                "month":
+                    month_abbr[
+                        month_number
+                    ],
 
-                "revenue": round(
-                    revenue,
-                    2
-                ),
+                "revenue":
+                    round(
+                        revenue,
+                        2
+                    ),
 
-                "expenses": round(
-                    expenses,
-                    2
-                ),
+                "expenses":
+                    round(
+                        expenses,
+                        2
+                    ),
 
-                "profit": round(
-                    profit,
-                    2
-                ),
+                "profit":
+                    round(
+                        profit,
+                        2
+                    ),
 
-                "gst": round(
-                    gst,
-                    2
-                ),
+                "gst":
+                    round(
+                        gst,
+                        2
+                    ),
 
-                "growth": round(
-                    growth,
-                    1
-                )
+                "growth":
+                    round(
+                        growth,
+                        1
+                    )
             }
         )
 
@@ -281,46 +365,59 @@ def dashboard_report(request):
         previous_revenue = revenue
 
 
-    # -----------------------------
-    # GST Chart
-    # -----------------------------
+    # =================================================
+    # GST ANALYTICS
+    # =================================================
 
     gst_total = (
         invoices.aggregate(
-            total=Sum("gst_amount")
+            total=Sum(
+                "gst_amount"
+            )
         )["total"]
         or 0
     )
 
 
+    gst_total_float = float(
+        gst_total
+    )
+
+
     gst_chart = {
 
-        "cgst": round(
-            float(gst_total) / 2,
-            2
-        ),
+        "cgst":
+            round(
+                gst_total_float / 2,
+                2
+            ),
 
-        "sgst": round(
-            float(gst_total) / 2,
-            2
-        ),
+        "sgst":
+            round(
+                gst_total_float / 2,
+                2
+            ),
 
         "igst": 0
 
     }
 
 
-    # -----------------------------
-    # Recent Invoices
-    # -----------------------------
+    # =================================================
+    # RECENT INVOICES
+    # =================================================
 
     recent = []
 
 
     recent_invoices = (
         invoices
-        .select_related("customer")
-        .order_by("-id")[:5]
+        .select_related(
+            "customer"
+        )
+        .order_by(
+            "-id"
+        )[:5]
     )
 
 
@@ -335,7 +432,9 @@ def dashboard_report(request):
                     invoice.customer.full_name,
 
                 "amount":
-                    float(invoice.grand_total),
+                    float(
+                        invoice.grand_total
+                    ),
 
                 "status":
                     invoice.status
@@ -343,14 +442,18 @@ def dashboard_report(request):
         )
 
 
-    # -----------------------------
-    # Insights
-    # -----------------------------
+    # =================================================
+    # TOP PRODUCT
+    # =================================================
 
     top_product = (
         Product.objects
-        .filter(user=user)
-        .order_by("-price")
+        .filter(
+            user=user
+        )
+        .order_by(
+            "-price"
+        )
         .first()
     )
 
@@ -371,6 +474,10 @@ def dashboard_report(request):
         )
 
 
+    # =================================================
+    # BEST SALES MONTH
+    # =================================================
+
     best_month = "-"
 
 
@@ -378,21 +485,29 @@ def dashboard_report(request):
 
         best = max(
             analytics_chart,
-            key=lambda x: x["revenue"]
+            key=lambda item:
+                item["revenue"]
         )
 
 
         if best["revenue"] > 0:
 
-            best_month = best["month"]
+            best_month = (
+                best["month"]
+            )
 
 
-    # -----------------------------
-    # API Response
-    # -----------------------------
+    # =================================================
+    # API RESPONSE
+    # =================================================
 
     return Response(
         {
+
+            # -----------------------------------------
+            # Dashboard Cards
+            # -----------------------------------------
+
             "total_customers":
                 total_customers,
 
@@ -402,20 +517,44 @@ def dashboard_report(request):
             "total_invoices":
                 total_invoices,
 
+
+            # -----------------------------------------
+            # Invoice Status Analytics
+            # -----------------------------------------
+
             "paid_invoices":
                 paid_invoices,
 
-            "pending_invoices":
-                pending_invoices,
+            "unpaid_invoices":
+                unpaid_invoices,
+
+            "draft_invoices":
+                draft_invoices,
+
+
+            # -----------------------------------------
+            # Revenue Analytics
+            # -----------------------------------------
 
             "total_revenue":
-                float(total_revenue),
+                float(
+                    total_revenue
+                ),
 
             "today_revenue":
-                float(today_revenue),
+                float(
+                    today_revenue
+                ),
 
             "monthly_revenue":
-                float(monthly_revenue),
+                float(
+                    monthly_revenue
+                ),
+
+
+            # -----------------------------------------
+            # Charts
+            # -----------------------------------------
 
             "revenue_chart":
                 revenue_chart,
@@ -429,8 +568,18 @@ def dashboard_report(request):
             "gst_chart":
                 gst_chart,
 
+
+            # -----------------------------------------
+            # Recent Invoice Data
+            # -----------------------------------------
+
             "recent_invoices":
                 recent,
+
+
+            # -----------------------------------------
+            # Business Insights
+            # -----------------------------------------
 
             "best_sales_month":
                 best_month,
@@ -440,10 +589,12 @@ def dashboard_report(request):
 
             "fastest_growing_category":
                 fastest_category
-        },
-        status=status.HTTP_200_OK
-    )
 
+        },
+
+        status=status.HTTP_200_OK
+
+    )
 
 # =====================================================
 # ADMIN REPORTS MANAGEMENT
